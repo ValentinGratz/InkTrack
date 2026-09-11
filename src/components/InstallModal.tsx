@@ -3,23 +3,32 @@ import { X, Droplet, Calendar } from 'lucide-react';
 
 type InstallModalProps = {
   onClose: () => void;
-  onInstall: (color: string) => void;
+  onInstall: (color: string, startDate: string) => void;
 };
 
 const PRESETS = ['Noir', 'Couleur', 'Cyan', 'Magenta', 'Jaune'];
 
-export default function InstallModal({ onClose, onInstall }: InstallModalProps) {
-  const [color, setColor] = useState('');
-  const today = new Date().toLocaleDateString('fr-FR', {
+function getTodayISO(): string {
+  return new Date().toISOString().split('T')[0];
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('fr-FR', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
   });
+}
+
+export default function InstallModal({ onClose, onInstall }: InstallModalProps) {
+  const [color, setColor] = useState('');
+  const [startDate, setStartDate] = useState(getTodayISO());
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!color.trim()) return;
-    onInstall(color.trim());
+    onInstall(color.trim(), startDate);
   };
 
   return (
@@ -28,7 +37,7 @@ export default function InstallModal({ onClose, onInstall }: InstallModalProps) 
       onClick={onClose}
     >
       <div
-        className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl animate-[slideUp_0.3s_ease-out]"
+        className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl animate-[slideUp_0.3s_ease-out] max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-6 pt-6 pb-2">
@@ -44,11 +53,6 @@ export default function InstallModal({ onClose, onInstall }: InstallModalProps) 
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 pb-6 pt-2">
-          <div className="flex items-center gap-2 text-sm text-slate-500 mb-5">
-            <Calendar size={16} />
-            <span>Installée le {today}</span>
-          </div>
-
           <label className="block text-sm font-medium text-slate-700 mb-2">
             Couleur / Modèle
           </label>
@@ -69,7 +73,7 @@ export default function InstallModal({ onClose, onInstall }: InstallModalProps) 
             ))}
           </div>
 
-          <div className="relative">
+          <div className="relative mb-5">
             <Droplet
               size={18}
               className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
@@ -82,6 +86,42 @@ export default function InstallModal({ onClose, onInstall }: InstallModalProps) 
               autoFocus
               className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300 transition-all"
             />
+          </div>
+
+          {/* Date de début */}
+          <div className="mb-2">
+            <button
+              type="button"
+              onClick={() => setShowDatePicker((v) => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 rounded-2xl border border-slate-200 hover:bg-slate-50 transition-colors"
+            >
+              <span className="flex items-center gap-2.5 text-sm text-slate-700">
+                <Calendar size={18} className="text-slate-400" />
+                Installée le {formatDate(startDate)}
+              </span>
+              <span className="text-xs text-slate-400 underline">
+                {showDatePicker ? 'Masquer' : 'Modifier la date'}
+              </span>
+            </button>
+
+            {showDatePicker && (
+              <div className="mt-2 p-4 bg-slate-50 rounded-2xl animate-[fadeIn_0.2s_ease-out]">
+                <label className="block text-xs font-medium text-slate-500 mb-2">
+                  Date d'installation
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  max={getTodayISO()}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300 transition-all"
+                />
+                <p className="text-xs text-slate-400 mt-2">
+                  Choisissez une date passée si vous aviez déjà commencé le suivi
+                  ailleurs.
+                </p>
+              </div>
+            )}
           </div>
 
           <button

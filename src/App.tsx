@@ -54,10 +54,10 @@ export default function App() {
   const activeCartridges = cartridges.filter((c) => !c.end_date);
   const historyCartridges = cartridges.filter((c) => c.end_date);
 
-  const handleInstall = async (color: string) => {
+  const handleInstall = async (color: string, startDate: string) => {
     const { error } = await supabase
       .from('cartridges')
-      .insert({ color, start_date: getTodayISODate() });
+      .insert({ color, start_date: startDate });
 
     if (error) {
       console.error("Erreur lors de l'installation:", error);
