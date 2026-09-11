@@ -1,10 +1,13 @@
-import { Droplet, RefreshCw, Calendar } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Droplet, RefreshCw, Calendar, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import type { Cartridge } from '@/lib/supabase';
 
 type CartridgeCardProps = {
   cartridge: Cartridge;
   daysElapsed: number;
   onReplace?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
   isActive: boolean;
 };
 
@@ -22,7 +25,6 @@ function getColorStyle(color: string): { bg: string; text: string; ring: string 
   if (lower.includes('jaune') || lower.includes('yellow')) {
     return { bg: 'bg-amber-400', text: 'text-amber-500', ring: 'ring-amber-400' };
   }
-  // "Couleur" or custom — use a multi-color gradient
   return { bg: 'bg-gradient-to-br from-rose-400 via-amber-300 to-cyan-400', text: 'text-slate-700', ring: 'ring-slate-400' };
 }
 
@@ -38,14 +40,28 @@ export default function CartridgeCard({
   cartridge,
   daysElapsed,
   onReplace,
+  onEdit,
+  onDelete,
   isActive,
 }: CartridgeCardProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const colorStyle = getColorStyle(cartridge.color);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [menuOpen]);
 
   return (
     <div className="group bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden transition-all hover:shadow-md">
       <div className="flex items-stretch">
-        {/* Color indicator bar */}
         <div className={`w-2.5 ${colorStyle.bg} shrink-0`} />
 
         <div className="flex-1 p-5">
@@ -69,6 +85,40 @@ export default function CartridgeCard({
                   </span>
                 </div>
               </div>
+            </div>
+
+            {/* Actions menu */}
+            <div className="relative" ref={menuRef}>
+              <button
+                onClick={() => setMenuOpen((v) => !v)}
+                className="p-2 -mr-1 rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+              >
+                <MoreVertical size={18} />
+              </button>
+              {menuOpen && (
+                <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-2xl shadow-lg border border-slate-100 py-1.5 z-20 animate-[fadeIn_0.15s_ease-out]">
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onEdit?.();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    <Pencil size={15} />
+                    Modifier
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onDelete?.();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-rose-600 hover:bg-rose-50 transition-colors"
+                  >
+                    <Trash2 size={15} />
+                    Supprimer
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

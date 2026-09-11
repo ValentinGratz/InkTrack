@@ -3,6 +3,8 @@ import { Plus, Droplet, Clock, History, Loader2 } from 'lucide-react';
 import { supabase, type Cartridge } from '@/lib/supabase';
 import InstallModal from '@/components/InstallModal';
 import ReplaceModal from '@/components/ReplaceModal';
+import EditModal from '@/components/EditModal';
+import DeleteModal from '@/components/DeleteModal';
 import CartridgeCard from '@/components/CartridgeCard';
 
 type Tab = 'active' | 'history';
@@ -22,6 +24,8 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('active');
   const [showInstall, setShowInstall] = useState(false);
   const [replaceTarget, setReplaceTarget] = useState<Cartridge | null>(null);
+  const [editTarget, setEditTarget] = useState<Cartridge | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Cartridge | null>(null);
   const [today, setToday] = useState(getTodayISODate());
 
   const fetchCartridges = useCallback(async () => {
@@ -86,6 +90,54 @@ export default function App() {
     }
 
     setReplaceTarget(null);
+    await fetchCartridges();
+  };
+
+  const handleEdit = async (updates: {
+    color: string;
+    start_date: string;
+    end_date: string | null;
+  }) => {
+    if (!editTarget) return;
+
+    const duration =
+      updates.end_date != null
+        ? daysBetween(updates.start_date, updates.end_date)
+        : null;
+
+    const { error } = await supabase
+      .from('cartridges')
+      .update({
+        color: updates.color,
+        start_date: updates.start_date,
+        end_date: updates.end_date,
+        duration_days: duration,
+      })
+      .eq('id', editTarget.id);
+
+    if (error) {
+      console.error('Erreur lors de la modification:', error);
+      return;
+    }
+
+    setEditTarget(null);
+    await fetchCartridges();
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+
+    const { error } = await supabase
+      .from('cartridges')
+      .delete()
+      .eq('id', deleteTarget.id);
+
+    if (error) {
+      console.error('Erreur lors de la suppression:', error);
+      return;
+    }
+
+    setDeleteTarget(null);
     await fetchCartridges();
   };
 
@@ -187,6 +239,8 @@ export default function App() {
                   cartridge={c}
                   daysElapsed={daysBetween(c.start_date, today)}
                   onReplace={() => setReplaceTarget(c)}
+                  onEdit={() => setEditTarget(c)}
+                  onDelete={() => setDeleteTarget(c)}
                   isActive
                 />
               ))}
@@ -211,6 +265,8 @@ export default function App() {
                 key={c.id}
                 cartridge={c}
                 daysElapsed={c.duration_days ?? 0}
+                onEdit={() => setEditTarget(c)}
+                onDelete={() => setDeleteTarget(c)}
                 isActive={false}
               />
             ))}
@@ -244,6 +300,20 @@ export default function App() {
           daysElapsed={daysBetween(replaceTarget.start_date, today)}
           onClose={() => setReplaceTarget(null)}
           onConfirm={handleReplace}
+        />
+      )}
+      {editTarget && (
+        <EditModal
+          cartridge={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSave={handleEdit}
+        />
+      )}
+      {deleteTarget && (
+        <DeleteModal
+          color={deleteTarget.color}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleDelete}
         />
       )}
     </div>
