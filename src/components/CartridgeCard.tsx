@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { Droplet, RefreshCw, Calendar, MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import { Droplet, RefreshCw, Calendar, MoreVertical, Pencil, Trash2, Tag, TrendingUp } from 'lucide-react';
 import type { Cartridge } from '@/lib/supabase';
 
 type CartridgeCardProps = {
   cartridge: Cartridge;
   daysElapsed: number;
+  avgLifespan: number | null;
   onReplace?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
@@ -29,16 +30,36 @@ function getColorStyle(color: string): { bg: string; text: string; ring: string 
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('fr-FR', {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
   });
 }
 
+function formatEstimatedDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+  year: 'numeric',
+  });
+}
+
+function formatPrice(price: number | null): string {
+  if (price == null) return '';
+  return price.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+}
+
+function formatCostPerDay(price: number | null, days: number): string | null {
+  if (price == null || days === 0) return null;
+  const cost = price / days;
+  return cost.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €/jour';
+}
+
 export default function CartridgeCard({
   cartridge,
   daysElapsed,
+  avgLifespan,
   onReplace,
   onEdit,
   onDelete,
@@ -59,13 +80,29 @@ export default function CartridgeCard({
     return () => document.removeEventListener('mousedown', handleClick);
   }, [menuOpen]);
 
+  const duration = cartridge.duration_days ?? daysElapsed;
+  const costPerDay = formatCostPerDay(cartridge.price, duration);
+
+  // Prediction logic for active cartridges
+  let progressPercent = 0;
+  let estimatedEndDate: string | null = null;
+  let isOverdue = false;
+
+  if (isActive && avgLifespan && avgLifespan > 0) {
+    progressPercent = Math.min(100, Math.round((daysElapsed / avgLifespan) * 100));
+    const estDate = new Date(cartridge.start_date + 'T00:00:00');
+    estDate.setDate(estDate.getDate() + avgLifespan);
+    estimatedEndDate = estDate.toISOString().split('T')[0];
+    isOverdue = daysElapsed > avgLifespan;
+  }
+
   return (
     <div className="group bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden transition-all hover:shadow-md">
       <div className="flex items-stretch">
         <div className={`w-2.5 ${colorStyle.bg} shrink-0`} />
 
         <div className="flex-1 p-5">
-          <div className="flex items-start justify-between mb-4">
+          <div className="flex items-start justify-between mb-3">
             <div className="flex items-center gap-3">
               <div
                 className={`w-10 h-10 rounded-2xl ${colorStyle.bg} flex items-center justify-center shadow-sm`}
@@ -122,36 +159,92 @@ export default function CartridgeCard({
             </div>
           </div>
 
-          {isActive ? (
-            <div className="flex items-end justify-between">
-              <div>
-                <div className="text-4xl font-bold text-slate-900 tabular-nums leading-none">
-                  {daysElapsed}
-                </div>
-                <div className="text-sm text-slate-400 mt-1">
-                  {daysElapsed <= 1 ? 'jour' : 'jours'} écoulés
-                </div>
-              </div>
-              <button
-                onClick={onReplace}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-900 hover:text-white transition-all active:scale-95"
-              >
-                <RefreshCw size={15} />
-                Remplacer
-              </button>
+          {/* Brand + Price badges */}
+          {(cartridge.brand || cartridge.price != null) && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {cartridge.brand && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 text-xs text-slate-500">
+                  <Tag size={11} />
+                  {cartridge.brand}
+                </span>
+              )}
+              {cartridge.price != null && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 text-xs text-slate-500">
+                  {formatPrice(cartridge.price)}
+                </span>
+              )}
             </div>
+          )}
+
+          {isActive ? (
+            <>
+              <div className="flex items-end justify-between mb-3">
+                <div>
+                  <div className="text-4xl font-bold text-slate-900 tabular-nums leading-none">
+                    {daysElapsed}
+                  </div>
+                  <div className="text-sm text-slate-400 mt-1">
+                    {daysElapsed <= 1 ? 'jour' : 'jours'} écoulés
+                  </div>
+                </div>
+                <button
+                  onClick={onReplace}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-900 hover:text-white transition-all active:scale-95"
+                >
+                  <RefreshCw size={15} />
+                  Remplacer
+                </button>
+              </div>
+
+              {/* Prediction + progress bar */}
+              {estimatedEndDate && (
+                <div className="pt-3 border-t border-slate-100">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-2">
+                    <TrendingUp size={13} className={isOverdue ? 'text-rose-500' : 'text-slate-400'} />
+                    {isOverdue ? (
+                      <span className="text-rose-500 font-medium">
+                        Dépassée de {daysElapsed - (avgLifespan ?? 0)} jours (est. {avgLifespan} j)
+                      </span>
+                    ) : (
+                      <span>
+                        Remplacement estimé : autour du {formatEstimatedDate(estimatedEndDate)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        isOverdue ? 'bg-rose-500' : progressPercent > 75 ? 'bg-amber-400' : colorStyle.bg
+                      }`}
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+                    <span>Jour {daysElapsed}</span>
+                    <span>Moy. {avgLifespan} j</span>
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             <div className="flex items-center justify-between">
               <div className="text-sm text-slate-500">
                 A duré{' '}
                 <span className="font-bold text-slate-900 text-lg">
-                  {cartridge.duration_days ?? daysElapsed}
+                  {duration}
                 </span>{' '}
-                {(cartridge.duration_days ?? daysElapsed) <= 1 ? 'jour' : 'jours'}
+                {duration <= 1 ? 'jour' : 'jours'}
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                <div className={`w-2 h-2 rounded-full ${colorStyle.bg}`} />
-                <span>Terminée</span>
+              <div className="flex items-center gap-3">
+                {costPerDay && (
+                  <span className="text-xs text-slate-400 font-medium">
+                    {costPerDay}
+                  </span>
+                )}
+                <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                  <div className={`w-2 h-2 rounded-full ${colorStyle.bg}`} />
+                  <span>Terminée</span>
+                </div>
               </div>
             </div>
           )}

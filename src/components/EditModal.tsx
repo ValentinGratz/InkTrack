@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Droplet, Calendar } from 'lucide-react';
+import { X, Droplet, Calendar, Euro, Tag } from 'lucide-react';
 import type { Cartridge } from '@/lib/supabase';
 
 type EditModalProps = {
@@ -9,6 +9,9 @@ type EditModalProps = {
     color: string;
     start_date: string;
     end_date: string | null;
+    duration_days: number | null;
+    price: number | null;
+    brand: string | null;
   }) => void;
 };
 
@@ -16,6 +19,10 @@ const PRESETS = ['Noir', 'Couleur', 'Cyan', 'Magenta', 'Jaune'];
 
 function getTodayISO(): string {
   return new Date().toISOString().split('T')[0];
+}
+
+function daysBetween(start: string, end: string): number {
+  return Math.max(0, Math.floor((new Date(end).getTime() - new Date(start).getTime()) / 86400000));
 }
 
 export default function EditModal({
@@ -27,17 +34,40 @@ export default function EditModal({
   const [startDate, setStartDate] = useState(cartridge.start_date);
   const isHistory = !!cartridge.end_date;
   const [endDate, setEndDate] = useState(cartridge.end_date ?? getTodayISO());
+  const [price, setPrice] = useState(
+    cartridge.price != null ? String(cartridge.price) : ''
+  );
+  const [brand, setBrand] = useState(cartridge.brand ?? '');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!color.trim()) return;
 
-    onSave({
-      color: color.trim(),
-      start_date: startDate,
-      end_date: isHistory ? endDate : null,
-    });
+    const priceNum = price.trim() ? parseFloat(price.replace(',', '.')) : null;
+    const brandVal = brand.trim() || null;
+
+    if (isHistory) {
+      onSave({
+        color: color.trim(),
+        start_date: startDate,
+        end_date: endDate,
+        duration_days: daysBetween(startDate, endDate),
+        price: priceNum,
+        brand: brandVal,
+      });
+    } else {
+      onSave({
+        color: color.trim(),
+        start_date: startDate,
+        end_date: null,
+        duration_days: null,
+        price: priceNum,
+        brand: brandVal,
+      });
+    }
   };
+
+  const invalidDates = isHistory && new Date(endDate) < new Date(startDate);
 
   return (
     <div
@@ -95,6 +125,37 @@ export default function EditModal({
             />
           </div>
 
+          {/* Brand / Model */}
+          <div className="relative mb-5">
+            <Tag
+              size={18}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="text"
+              value={brand}
+              onChange={(e) => setBrand(e.target.value)}
+              placeholder="Marque / Modèle (ex: HP 305)"
+              className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300 transition-all"
+            />
+          </div>
+
+          {/* Price */}
+          <div className="relative mb-5">
+            <Euro
+              size={18}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="text"
+              inputMode="decimal"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              placeholder="Prix d'achat (€) — optionnel"
+              className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300 transition-all"
+            />
+          </div>
+
           <label className="block text-sm font-medium text-slate-700 mb-2">
             <span className="flex items-center gap-1.5">
               <Calendar size={15} className="text-slate-400" />
@@ -125,7 +186,7 @@ export default function EditModal({
                 onChange={(e) => setEndDate(e.target.value)}
                 className="w-full px-3.5 py-3 rounded-2xl border border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300 transition-all mb-1"
               />
-              {new Date(endDate) < new Date(startDate) && (
+              {invalidDates && (
                 <p className="text-xs text-rose-500 mt-1">
                   La date de fin ne peut pas être antérieure à la date de début.
                 </p>
@@ -135,10 +196,7 @@ export default function EditModal({
 
           <button
             type="submit"
-            disabled={
-              !color.trim() ||
-              (isHistory && new Date(endDate) < new Date(startDate))
-            }
+            disabled={!color.trim() || invalidDates}
             className="w-full mt-5 py-3.5 rounded-2xl bg-slate-900 text-white font-semibold disabled:opacity-30 disabled:cursor-not-allowed enabled:hover:bg-slate-800 transition-colors"
           >
             Enregistrer les modifications
