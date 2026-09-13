@@ -2,8 +2,8 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch: # Permet de lancer la fabrication manuellement
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -30,9 +30,9 @@ jobs:
       - name: Build Web App
         run: npm run build
 
-      - name: Install Android Deployment Tools
+      - name: Setup Capacitor
         run: |
-          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npx cap add android || true
           npx cap sync android
 
       - name: Build Android APK
@@ -43,5 +43,5 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: InkTrack-Android-APK
+          name: InkTrack-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk

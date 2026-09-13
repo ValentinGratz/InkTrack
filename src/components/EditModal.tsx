@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { X, Droplet, Calendar, Euro, Tag } from 'lucide-react';
-import type { Cartridge } from '@/lib/supabase';
+import type { Cartridge } from '@/lib/storage';
 
 type EditModalProps = {
   cartridge: Cartridge;

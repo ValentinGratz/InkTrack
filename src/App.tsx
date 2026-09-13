@@ -1,6 +1,13 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Droplet, Clock, History, Loader2, BarChart3, Download, Upload } from 'lucide-react';
-import { supabase, type Cartridge } from '@/lib/supabase';
+import { useState, useEffect, useMemo } from 'react';
+import { Plus, Droplet, Clock, History, Loader2, BarChart3 } from 'lucide-react';
+import {
+  type Cartridge,
+  loadCartridges,
+  insertCartridge,
+  updateCartridge,
+  deleteCartridge,
+  replaceAllCartridges,
+} from '@/lib/storage';
 import InstallModal from '@/components/InstallModal';
 import ReplaceModal from '@/components/ReplaceModal';
 import EditModal from '@/components/EditModal';
@@ -30,26 +37,15 @@ export default function App() {
   const [deleteTarget, setDeleteTarget] = useState<Cartridge | null>(null);
   const [today, setToday] = useState(getTodayISODate());
 
-  const fetchCartridges = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('cartridges')
-      .select('*')
-      .order('start_date', { ascending: false });
-
-    if (error) {
-      console.error('Erreur lors du chargement:', error);
-      return;
-    }
-    setCartridges((data as Cartridge[]) ?? []);
-  }, []);
+  const refresh = () => {
+    setCartridges(loadCartridges());
+  };
 
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      await fetchCartridges();
-      setLoading(false);
-    })();
-  }, [fetchCartridges]);
+    setLoading(true);
+    refresh();
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => setToday(getTodayISODate()), 60_000);
@@ -59,7 +55,6 @@ export default function App() {
   const activeCartridges = cartridges.filter((c) => !c.end_date);
   const historyCartridges = cartridges.filter((c) => c.end_date);
 
-  // Average lifespan per color for predictions
   const avgLifespanByColor = useMemo(() => {
     const map = new Map<string, number>();
     const groups = new Map<string, number[]>();
@@ -79,7 +74,7 @@ export default function App() {
     return avgLifespanByColor.get(color) ?? null;
   };
 
-  const handleInstall = async (data: {
+  const handleInstall = (data: {
     color: string;
     start_date: string;
     end_date: string | null;
@@ -87,46 +82,22 @@ export default function App() {
     price: number | null;
     brand: string | null;
   }) => {
-    const { error } = await supabase.from('cartridges').insert({
-      color: data.color,
-      start_date: data.start_date,
-      end_date: data.end_date,
-      duration_days: data.duration_days,
-      price: data.price,
-      brand: data.brand,
-    });
-
-    if (error) {
-      console.error("Erreur lors de l'installation:", error);
-      return;
-    }
-
+    insertCartridge(data);
     setShowInstall(false);
     setTab(data.end_date ? 'history' : 'active');
-    await fetchCartridges();
+    refresh();
   };
 
-  const handleReplace = async () => {
+  const handleReplace = () => {
     if (!replaceTarget) return;
-
     const endDate = getTodayISODate();
     const duration = daysBetween(replaceTarget.start_date, endDate);
-
-    const { error } = await supabase
-      .from('cartridges')
-      .update({ end_date: endDate, duration_days: duration })
-      .eq('id', replaceTarget.id);
-
-    if (error) {
-      console.error('Erreur lors du remplacement:', error);
-      return;
-    }
-
+    updateCartridge(replaceTarget.id, { end_date: endDate, duration_days: duration });
     setReplaceTarget(null);
-    await fetchCartridges();
+    refresh();
   };
 
-  const handleEdit = async (updates: {
+  const handleEdit = (updates: {
     color: string;
     start_date: string;
     end_date: string | null;
@@ -135,68 +106,21 @@ export default function App() {
     brand: string | null;
   }) => {
     if (!editTarget) return;
-
-    const { error } = await supabase
-      .from('cartridges')
-      .update({
-        color: updates.color,
-        start_date: updates.start_date,
-        end_date: updates.end_date,
-        duration_days: updates.duration_days,
-        price: updates.price,
-        brand: updates.brand,
-      })
-      .eq('id', editTarget.id);
-
-    if (error) {
-      console.error('Erreur lors de la modification:', error);
-      return;
-    }
-
+    updateCartridge(editTarget.id, updates);
     setEditTarget(null);
-    await fetchCartridges();
+    refresh();
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!deleteTarget) return;
-
-    const { error } = await supabase
-      .from('cartridges')
-      .delete()
-      .eq('id', deleteTarget.id);
-
-    if (error) {
-      console.error('Erreur lors de la suppression:', error);
-      return;
-    }
-
+    deleteCartridge(deleteTarget.id);
     setDeleteTarget(null);
-    await fetchCartridges();
+    refresh();
   };
 
-  const handleImport = async (data: Cartridge[]) => {
-    // Delete all existing and re-insert from backup
-    await supabase.from('cartridges').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-
-    const rows = data.map((c) => ({
-      id: c.id,
-      color: c.color,
-      start_date: c.start_date,
-      end_date: c.end_date,
-      duration_days: c.duration_days,
-      price: c.price,
-      brand: c.brand,
-      created_at: c.created_at,
-    }));
-
-    const { error } = await supabase.from('cartridges').insert(rows);
-
-    if (error) {
-      console.error('Erreur lors de l\'import:', error);
-      return;
-    }
-
-    await fetchCartridges();
+  const handleImport = (data: Cartridge[]) => {
+    replaceAllCartridges(data);
+    refresh();
   };
 
   const tabs: { id: Tab; label: string; icon: typeof Clock; count?: number }[] = [

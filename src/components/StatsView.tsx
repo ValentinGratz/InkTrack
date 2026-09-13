@@ -1,5 +1,5 @@
 import { BarChart3, Droplet, TrendingUp, Euro, Calendar } from 'lucide-react';
-import type { Cartridge } from '@/lib/supabase';
+import type { Cartridge } from '@/lib/storage';
 
 type StatsViewProps = {
   cartridges: Cartridge[];

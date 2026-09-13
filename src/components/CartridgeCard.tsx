@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Droplet, RefreshCw, Calendar, MoreVertical, Pencil, Trash2, Tag, TrendingUp } from 'lucide-react';
-import type { Cartridge } from '@/lib/supabase';
+import type { Cartridge } from '@/lib/storage';
 
 type CartridgeCardProps = {
   cartridge: Cartridge;

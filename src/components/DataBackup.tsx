@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react';
 import { Download, Upload, CheckCircle2, AlertCircle } from 'lucide-react';
-import type { Cartridge } from '@/lib/supabase';
+import type { Cartridge } from '@/lib/storage';
 
 type DataBackupProps = {
   cartridges: Cartridge[];
-  onImport: (data: Cartridge[]) => Promise<void>;
+  onImport: (data: Cartridge[]) => void;
 };
 
 export default function DataBackup({ cartridges, onImport }: DataBackupProps) {
